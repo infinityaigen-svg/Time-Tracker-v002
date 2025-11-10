@@ -56,4 +56,5 @@ export interface Task {
   logs: TaskLog[];
   notes: TaskNote[];
   urlLink?: string;
+  dependsOn?: string[];
 }

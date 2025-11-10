@@ -273,6 +273,7 @@ export const App: React.FC = () => {
         task={editingTask}
         currentUser={currentUser}
         users={users}
+        tasks={tasks}
       />
     </div>
   );

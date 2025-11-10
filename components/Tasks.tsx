@@ -155,6 +155,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, onEditTask, users, currentUser }) 
                     Task Name {getSortIndicator('name')}
                 </button>
               </th>
+               <th scope="col" className="px-6 py-3 text-center">
+                Deps
+              </th>
               <th scope="col" className="px-6 py-3">
                  <button onClick={() => requestSort('assignedTo')} className="flex items-center gap-2 transition-colors hover:text-white">
                     Assigned To {getSortIndicator('assignedTo')}
@@ -181,6 +184,24 @@ const Tasks: React.FC<TasksProps> = ({ tasks, onEditTask, users, currentUser }) 
             {filteredAndSortedTasks.map(task => (
               <tr key={task.id} className="bg-slate-800 border-b border-slate-700 hover:bg-slate-700/50 cursor-pointer" onClick={() => onEditTask(task)}>
                 <td className="px-6 py-4 font-medium text-white">{task.name}</td>
+                <td className="px-6 py-4 text-center">
+                    {task.dependsOn && task.dependsOn.length > 0 ? (
+                        <div className="group relative w-full flex justify-center">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-700 text-xs font-bold text-slate-300">{task.dependsOn.length}</span>
+                            <div className="absolute bottom-full mb-2 w-48 bg-slate-800 text-slate-300 text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg border border-slate-700">
+                                <span className="font-bold block border-b border-slate-600 mb-1 pb-1">Depends On:</span>
+                                <ul className="list-disc list-inside">
+                                    {task.dependsOn.map(depId => {
+                                        const depTask = tasks.find(t => t.id === depId);
+                                        return depTask ? <li key={depId} className="truncate">{depTask.name}</li> : null;
+                                    })}
+                                </ul>
+                            </div>
+                        </div>
+                    ) : (
+                        <span className="text-slate-600">-</span>
+                    )}
+                </td>
                 <td className="px-6 py-4">{users.find(u => u.email === task.assignedTo)?.name || task.assignedTo}</td>
                 <td className="px-6 py-4">{task.status}</td>
                 <td className="px-6 py-4">{new Date(task.createdAt).toLocaleDateString()}</td>

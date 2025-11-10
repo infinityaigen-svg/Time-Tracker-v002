@@ -3,6 +3,7 @@ import { Task, TaskStatus, User, UserRole } from '../types';
 
 interface TaskCardProps {
   task: Task;
+  allTasks: Task[];
   currentUser: User;
   onUpdate: (task: Task) => void;
   onEdit: (task: Task) => void;
@@ -20,6 +21,13 @@ const StopIcon: React.FC = () => (
 const CheckIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
 );
+
+const DependencyIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+    </svg>
+);
+
 
 const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
   const colorClass = progress >= 80 ? 'bg-red-500' : 'bg-green-500';
@@ -41,7 +49,7 @@ const formatTime = (totalSeconds: number): string => {
   return `${hours}:${minutes}:${seconds}`;
 };
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onUpdate, onEdit, showNotification }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, allTasks, currentUser, onUpdate, onEdit, showNotification }) => {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -63,6 +71,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onUpdate, onEdit
     }
     return task.elapsedTime;
   }, [task.status, task.elapsedTime, task.startedAt, now]);
+  
+  const { dependencies, areDependenciesMet } = useMemo(() => {
+    if (!task.dependsOn || task.dependsOn.length === 0) {
+      return { dependencies: [], areDependenciesMet: true };
+    }
+    const deps = task.dependsOn
+      .map(depId => allTasks.find(t => t.id === depId))
+      .filter((t): t is Task => t !== undefined);
+    
+    const met = deps.every(d => d.status === TaskStatus.COMPLETED);
+    
+    return { dependencies: deps, areDependenciesMet: met };
+  }, [task.dependsOn, allTasks]);
 
 
   const handleStart = () => {
@@ -107,7 +128,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onUpdate, onEdit
   return (
       <div className="bg-slate-900/70 p-4 rounded-lg shadow-lg flex flex-col justify-between border border-slate-700 hover:border-cyan-500 transition-colors cursor-pointer" onClick={() => onEdit(task)}>
         <div>
-          <h4 className="font-bold text-slate-100 mb-2">{task.name}</h4>
+          <div className="flex justify-between items-start">
+            <h4 className="font-bold text-slate-100 mb-2 pr-2">{task.name}</h4>
+            {dependencies.length > 0 && (
+                <div className="group relative flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <DependencyIcon />
+                    <div className="absolute bottom-full mb-2 right-0 w-48 bg-slate-800 text-slate-300 text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg border border-slate-700">
+                        <span className="font-bold block border-b border-slate-600 mb-1 pb-1">Depends On:</span>
+                        <ul className="list-disc list-inside">
+                            {dependencies.map(d => <li key={d.id} className={`truncate ${d.status === TaskStatus.COMPLETED ? 'text-green-400' : 'text-slate-400'}`}>{d.name}</li>)}
+                        </ul>
+                    </div>
+                </div>
+            )}
+          </div>
           <div className="flex justify-between items-center text-xs text-slate-400 mb-3">
             <span>Assigned to: <span className='font-semibold text-slate-300'>{assignedUser}</span></span>
           </div>
@@ -121,7 +155,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onUpdate, onEdit
         </div>
         <div className="mt-3">
           {task.status === TaskStatus.NEW && (
-            <button onClick={(e) => { e.stopPropagation(); handleStart(); }} className="w-full flex items-center justify-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition-all text-sm"><PlayIcon /> Start Task</button>
+            <div className="group relative">
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleStart(); }} 
+                className="w-full flex items-center justify-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition-all text-sm disabled:bg-slate-600 disabled:cursor-not-allowed"
+                disabled={!areDependenciesMet}
+              >
+                <PlayIcon /> Start Task
+              </button>
+              {!areDependenciesMet && (
+                <div className="absolute bottom-full mb-2 w-full bg-slate-800 text-slate-300 text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg border border-slate-700 text-center">
+                    Cannot start until dependencies are completed.
+                </div>
+              )}
+            </div>
           )}
           {task.status === TaskStatus.STARTED && (
             <button onClick={(e) => { e.stopPropagation(); handleEnd(); }} className="w-full flex items-center justify-center px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-md transition-all text-sm"><StopIcon /> End Task</button>

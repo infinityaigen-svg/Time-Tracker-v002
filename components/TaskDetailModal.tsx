@@ -8,6 +8,7 @@ interface TaskDetailModalProps {
   task: Task | null;
   currentUser: User;
   users: User[];
+  tasks: Task[];
 }
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
@@ -25,7 +26,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
   );
 };
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSubmit, task, currentUser, users }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSubmit, task, currentUser, users, tasks }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [estimatedHours, setEstimatedHours] = useState(0);
@@ -33,6 +34,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSu
   const [assignedTo, setAssignedTo] = useState(users.find(u => u.role !== UserRole.ADMIN)?.email || '');
   const [urlLink, setUrlLink] = useState('');
   const [newNote, setNewNote] = useState('');
+  const [dependsOn, setDependsOn] = useState<string[]>([]);
   
   const isEditing = task !== null;
 
@@ -46,6 +48,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSu
       setEstimatedMinutes(Math.round(minutes / 5) * 5); // Round to nearest 5 for dropdown
       setAssignedTo(task.assignedTo);
       setUrlLink(task.urlLink || '');
+      setDependsOn(task.dependsOn || []);
     } else if (isOpen && !task) {
       // Reset for new task
       setName('');
@@ -54,12 +57,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSu
       setEstimatedMinutes(30);
       setAssignedTo(users.find(u => u.role !== UserRole.ADMIN && u.isActive)?.email || '');
       setUrlLink('');
+      setDependsOn([]);
     }
   }, [isOpen, task, users]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const commonData = { name, description, assignedTo, urlLink };
+    const commonData = { name, description, assignedTo, urlLink, dependsOn };
     const estimatedTimeInSeconds = estimatedHours * 3600 + estimatedMinutes * 60;
     
     if (isEditing) {
@@ -75,6 +79,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSu
         }
         if (task.estimatedTime !== estimatedTimeInSeconds) {
             updatedLogs.push({ timestamp: Date.now(), user: currentUser.email, change: `Estimated time updated.` });
+        }
+        if (JSON.stringify(task.dependsOn || []) !== JSON.stringify(dependsOn)) {
+            updatedLogs.push({ timestamp: Date.now(), user: currentUser.email, change: `Dependencies updated.` });
         }
         onSubmit({ ...task, ...commonData, estimatedTime: estimatedTimeInSeconds, logs: updatedLogs });
     } else {
@@ -99,6 +106,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSu
 
   const hourOptions = [...Array(13).keys()]; // 0-12 hours
   const minuteOptions = [...Array(12).keys()].map(m => m * 5); // 0, 5, 10... 55 minutes
+  const availableTasksForDependency = tasks.filter(t => t.id !== task?.id);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -147,6 +155,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onSu
                 {users.filter(u => u.role !== UserRole.ADMIN && u.isActive).map(user => <option key={user.id} value={user.email}>{user.name}</option>)}
               </select>
             </div>
+          </div>
+          <div>
+            <label htmlFor="dependsOn" className="block text-sm font-medium text-slate-400 mb-1">Depends On (hold Ctrl/Cmd to select multiple)</label>
+            <select
+              id="dependsOn"
+              multiple
+              value={dependsOn}
+              // Fix: Explicitly type `option` as HTMLOptionElement to resolve TypeScript inference issue where it was being inferred as `unknown`.
+              onChange={(e) => setDependsOn(Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value))}
+              className="w-full input-style h-24"
+            >
+              {availableTasksForDependency.map(depTask => (
+                <option key={depTask.id} value={depTask.id}>{depTask.name}</option>
+              ))}
+            </select>
           </div>
           
           {/* Notes and Logs for editing tasks */}

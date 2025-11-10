@@ -46,6 +46,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, tasks, onUpdateTask,
                 <TaskCard
                   key={task.id}
                   task={task}
+                  allTasks={tasks}
                   onUpdate={onUpdateTask}
                   onEdit={onEditTask}
                   showNotification={showNotification}
